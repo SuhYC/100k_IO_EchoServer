@@ -1,7 +1,8 @@
 # 100k_IO_EchoServer
 Cpp Network, IOCP
+Cs Network, async/await
 
-## 초당 10만회의 IO를 수행할 수 있는 에코서버를 만들어보자.
+## 초당 10만회의 패킷처리를 수행할 수 있는 에코서버를 만들어보자.
 [기존 진행하던 프로젝트](https://github.com/SuhYC/RPGServer)는 C++환경과 C#환경 사이에서의 원활한 네트워크 송수신을 위해 링버퍼를 도입하고, <br/>
 패킷 분할을 처리하기 위해 ```[size]```와 같은 헤더를 부착하여 송신하고, 수신 측에서 해당 헤더를 제거하는 작업을 수행했다. <br/>
 이 과정에서 ```[size]```와 같은 문자열을 부착하고 처리하는 과정은 상당히 비효율적이다. <br/>
@@ -37,11 +38,52 @@ Cpp Network, IOCP
 ![결과4](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/4.png) <br/>
 ![결과5](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/5.png) <br/>
 
-5회 실행 결과는 100만회 기준으로 10226 밀리초, 10375 밀리초, 9800 밀리초, 9710 밀리초, 10451 밀리초가 측정되었다. <br/>
+5회 실행 결과는 100만 패킷 기준으로 10226 밀리초, 10375 밀리초, 9800 밀리초, 9710 밀리초, 10451 밀리초가 측정되었다. <br/>
 10만회의 송수신에는 평균 1.01124 초가 소요되었다. <br/>
-5회의 실행 중 2회의 실행에서는 초당 10만회 이상의 송수신을 하는데 성공하였으며 <br/>
+5회의 실행 중 2회의 실행에서는 초당 10만 패킷 이상의 송수신을 하는데 성공하였으며 <br/>
 초당 10만회 이상의 송수신을 매 시도마다 하지는 못하더라도 10만회에 근접한 송수신을 성공하는 모습을 보였다.
 
-## 다음 목표
-~C#과 C++ 사이에서도 이러한 송수신이 가능한지 알아보고 적용해보기~ <br/>
-(Unity와 연결해보았으나 초당 1000회 IO밖에 나오지 않음. 별도의 C# 프로그램을 작성하여 테스트해야겠음.)
+## C++과 C# 사이에서도 가능할까?
+C#에서도 어느정도의 메모리복사연산이 가능하며(```Buffer.BlockCopy```), 이를 통해 링버퍼와 헤더처리를 적용할 수 있다. <br/>
+또한 ```async/await```를 통한 비동기 로직이 가능하기 때문에 비동기 네트워크를 이용하여 더욱 더 효율적인 IO가 가능하다. <br/>
+
+4바이트 헤더의 처리를 위해 메모리연산을 사용하는 과정에서 비트연산을 통해 처리해보고자 하는 시도가 있었는데, <br/>
+여기서 알게된 사실은 ```uint``` 데이터(혹은 C++의 ```unsigned int```)는 리틀엔디안으로 표현된다는 사실이다. <br/>
+쉽게 말하면 0x00000005를 저장한다고 가정하면 byte[]배열에 byte[0] = 0x05, byte[1] = 0x00, byte[2] = 0x00, byte[3] = 0x00으로 저장된다는 것. <br/>
+모든 아키텍처가 리틀엔디안을 사용하는 것은 아니지만 대부분의 아키텍처에서는 이렇게 적용하는 것이 더 효율적이라고 한다.
+
+## 초기 시도
+초기 시도에서는 초당 3500회(심지어 Unity에서 시도했을 때에는 초당 1000회 수준이었다.)의 패킷처리밖에 불가능했는데,<br/>
+이 이유를 찾아보니 async/await를 온전히 다루지 못했던 것에 있었다. <br/>
+
+다음 사진 3장이 개선 전의 코드인데, <br/>
+![recv](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/recv.png) <br/>
+![sendmsg](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/sendmsg.png) <br/>
+![sendIO](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/sendio.png) <br/>
+
+```RecvMsg```에서 수신이 완료되면, 헤더처리 클래스인 ResHandler에서 헤더를 처리한 후, <br/>
+```SendMsg```함수로 넘겨 송신 큐에 담고, <br/>
+바로 이어서 ```SendIO```함수에서 송신까지 마친 후에 다시 ```RecvMsg```의 실행흐름으로 돌아와 반복문을 돌게 된다. <br/>
+
+즉, 수신이 완료되어야 처리를 할 수 있고, 처리가 완료되어야 송신을 할 수 있는 구조인 셈이다. <br/>
+
+## 개선
+이를 다음과 같이 개선하였다. <br/>
+![NewSendMsg](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/NewSendMsg.png) <br/>
+![NewSendIO](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/NewSendIO.png) <br/>
+
+```SendMsg```는 이제 송신큐에 데이터를 담기만 하고 바로 ```RecvMsg```의 실행흐름으로 돌아와 반복문을 돈다. <br/>
+```SendIO```는 별도의 실행흐름으로 송신큐를 확인하고 전송할 메시지가 있으면 송신한다. 없다면 ```Task.Delay(0);```를 통해 다른 실행흐름을 실행하도록 한다. <br/>
+
+즉, 수신 흐름에서 헤더 처리한 데이터를 송신큐에 담는 작업과, 송신큐에서 데이터를 가져와 송신하는 작업을 분리하여 비동기적으로 실행할 수 있도록 개선하였다. <br/>
+
+## Echo Test Between Cs and Cpp 결과
+![결과1](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/1.png) <br/>
+![결과2](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/2.png) <br/>
+![결과3](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/3.png) <br/>
+![결과4](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/4.png) <br/>
+![결과5](https://github.com/SuhYC/100k_IO_EchoServer/blob/main/CppToCs_Result/5.png) <br/>
+
+5회 실행 결과는 10만 패킷 기준으로 1426ms, 1340ms, 1414ms, 1192ms, 1398ms가 소요되었으며, <br/>
+평균적으로 1354ms가 소요되었다. <br/>
+즉, 초당 평균 73855개의 패킷을 처리할 수 있었다.
