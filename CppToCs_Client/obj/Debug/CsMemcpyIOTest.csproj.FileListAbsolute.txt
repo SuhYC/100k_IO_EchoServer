@@ -1,0 +1,7 @@
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\bin\Debug\CsMemcpyIOTest.exe.config
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\bin\Debug\CsMemcpyIOTest.exe
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\bin\Debug\CsMemcpyIOTest.pdb
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\obj\Debug\CsMemcpyIOTest.csproj.AssemblyReference.cache
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\obj\Debug\CsMemcpyIOTest.csproj.CoreCompileInputs.cache
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\obj\Debug\CsMemcpyIOTest.exe
+C:\Users\psyc\source\repos\CsMemcpyIOTest\CsMemcpyIOTest\obj\Debug\CsMemcpyIOTest.pdb
